@@ -179,6 +179,24 @@ fun revertAndroid15VmaBlock(taskMmu: File, namespace: File) {
 
 /** 兜底修复 */
 fun applyPostPatchFixups() {
+    val kernelUmount = f("drivers/kernelsu/feature/kernel_umount.c")
+    if (kernelUmount.exists()) {
+        val content = kernelUmount.readText()
+        if (
+            content.contains(".set_handler = kernel_umount_feature_set") &&
+            !Regex("""static\s+int\s+kernel_umount_feature_set\s*\(""").containsMatchIn(content)
+        ) {
+            kernelUmount.replaceEachLine(
+                Regex("""^(\s*)\.set_handler\s*=\s*kernel_umount_feature_set\s*,"""),
+                "$1.set_handler = NULL,"
+            )
+            logPostfix(
+                kernelUmount,
+                "replaced missing kernel_umount_feature_set callback with NULL set_handler to avoid undefined symbol on older KernelSU baselines"
+            )
+        }
+    }
+
     val taskMmu = f("fs/proc/task_mmu.c")
     if (taskMmu.exists()) {
         val content = taskMmu.readText()
